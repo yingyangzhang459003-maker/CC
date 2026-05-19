@@ -9,8 +9,9 @@
 | `messages` | 信息源消息 | `message_id`, `source`, `title`, `content`, `url`, `published_at`, `captured_at`, `processed` |
 | `ai_signals` | AI 或启发式分析信号 | `signal_id`, `message_id`, `market_id`, `direction`, `confidence`, `impact_score`, `suggested_action` |
 | `price_snapshots` | 盘口价格快照 | `market_id`, `yes_price`, `no_price`, `volume`, `liquidity`, `captured_at` |
-| `paper_trades` | 纸面交易记录 | `paper_trade_id`, `signal_id`, `direction`, `entry_price`, `position_size`, `pnl`, `status` |
+| `paper_trades` | 纸面交易记录 | `paper_trade_id`, `signal_id`, `direction`, `entry_price`, `position_size`, `shares`, `risk_budget`, `pnl`, `unrealized_pnl`, `status` |
 | `source_configs` | 信息源配置扩展 | `source`, `enabled`, `config_json` |
 | `system_logs` | 系统日志 | `level`, `module`, `message`, `created_at` |
+| `runtime_runs` | 后台运行审计 | `run_id`, `command`, `status`, `started_at`, `finished_at`, `duration_seconds`, `result_json`, `error_message` |
 
-第一阶段的数据库设计偏向可解释与可迁移，而不是高频交易性能。后续如果数据量增长，可以迁移到 PostgreSQL。
+第一阶段的数据库设计偏向可解释与可迁移，而不是高频交易性能。核心增强版新增 `runtime_runs`，用于审计后台循环执行结果、失败原因和耗时；同时增强 `paper_trades` 的风险与复盘字段，使纸面交易可以在价格刷新后持续更新未实现盈亏，并在触发止损或止盈时关闭。后续如果数据量增长，可以迁移到 PostgreSQL。

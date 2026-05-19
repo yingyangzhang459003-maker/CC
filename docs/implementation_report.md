@@ -18,6 +18,7 @@
 | 交易方式 | 已实现纸面交易 | 不涉及真钱、不接钱包、不需要私钥。 |
 | 展示方式 | 已实现 | Streamlit 仪表盘展示市场、评分、消息、信号、纸面交易和价格快照。 |
 | 版本管理 | 已准备 | 项目已具备 Git 仓库初始化条件和 GitHub 同步说明。 |
+| 核心增强 | 已完成 | 已补充市场过滤排序、纸面交易风险预算、价格复盘、后台运行记录、健康检查和 systemd 模板。 |
 
 ## 二、系统架构概览
 
@@ -33,7 +34,9 @@
 | 判断层 | AI 信号 | `src/ai_signal.py` | 输出 YES、NO、WATCH 或 SKIP，并给出置信度与原因。 |
 | 交易层 | 纸面交易 | `src/paper_trader.py` | 根据信号创建模拟交易，不触达真实资金。 |
 | 风控层 | 风险规则 | `src/risk_rules.py` | 计算止损、止盈和估算净 PnL。 |
-| 追踪层 | 价格跟踪 | `src/price_tracker.py` | 记录价格快照和纸面交易观察窗口。 |
+| 追踪层 | 价格跟踪 | `src/price_tracker.py` | 记录价格快照、未实现盈亏、止损止盈和纸面交易观察窗口。 |
+| 运行层 | 运行监控 | `src/runtime_monitor.py` | 记录后台循环每次执行的状态、耗时、结果 JSON 和错误信息。 |
+| 部署层 | worker 与 systemd | `scripts/run_worker.sh`, `deploy/polymarket-nvidia-event-radar.service` | 提供长期运行入口与自恢复部署模板。 |
 | 展示层 | 仪表盘 | `app/dashboard.py` | 用 Streamlit 展示运行状态和数据结果。 |
 
 ## 三、数据库设计
@@ -50,6 +53,7 @@
 | `paper_trades` | 保存模拟交易与复盘字段 | `entry_price`, `position_size`, `stop_loss`, `take_profit`, `pnl`, `status` |
 | `source_configs` | 为后续动态配置源预留 | `source`, `enabled`, `config_json` |
 | `system_logs` | 保存系统日志 | `level`, `module`, `message`, `created_at` |
+| `runtime_runs` | 保存后台运行审计 | `run_id`, `command`, `status`, `duration_seconds`, `result_json`, `error_message` |
 
 ## 四、已完成的关键功能
 
@@ -62,7 +66,10 @@
 | SEC 监控 | 使用 SEC company submissions JSON 接口读取 NVIDIA filings。SEC 要求 API 请求携带合适的 User-Agent。[2] | `src/sources/sec_source.py` |
 | RSS 监控 | 使用 `requests` 加超时读取 RSS，再交给 `feedparser` 解析，避免网络源卡住整个流程。 | `src/sources/rss_source.py` |
 | AI 判断 | 默认启发式，可选 OpenAI；输出 JSON 风格字段并落库。 | `src/ai_signal.py` |
-| 纸面交易 | 按配置生成模拟仓位、止损价、止盈价。 | `src/paper_trader.py`, `src/risk_rules.py` |
+| 纸面交易 | 按配置生成模拟仓位、止损价、止盈价，并加入置信度、影响分、总持仓上限和同一信号去重约束。 | `src/paper_trader.py`, `src/risk_rules.py` |
+| 价格复盘 | 刷新价格快照后更新纸面交易未实现盈亏，并按风险规则关闭触发止损或止盈的交易。 | `src/price_tracker.py`, `src/risk_rules.py` |
+| 后台运行 | 循环运行时记录成功、失败、耗时和结果摘要；异常时按配置退避，避免单次公网 API 故障导致进程退出。 | `src/main.py`, `src/runtime_monitor.py` |
+| 健康检查 | 输出市场、消息、信号、交易、价格快照和最近运行记录，便于外部监控或人工巡检。 | `scripts/health_check.py` |
 | 仪表盘 | 用 Streamlit 展示数据表与核心指标。Streamlit 是面向数据应用的 Python Web 应用框架。[3] | `app/dashboard.py` |
 
 ## 五、运行与验证结果
@@ -79,6 +86,8 @@
 | AI 分析 | `python3.11 -m src.main analyze --config config/config.example.yaml` | 已生成 26 条结构化信号。 |
 | 纸面交易 | `python3.11 -m src.main paper-trades --config config/config.example.yaml` | 已创建 3 条纸面交易。 |
 | 仪表盘 | `timeout 12 streamlit run app/dashboard.py --server.headless true --server.port 8501` | 服务成功启动后按测试超时停止。 |
+| 核心增强回归 | `pytest -q` | 4 个测试全部通过，覆盖交易、风险退出与状态摘要。 |
+| 健康状态 | `python3.11 -m src.main status --config config/config.example.yaml` | 可输出 `health_status=ok` 与最近运行记录。 |
 
 ## 六、如何继续运行
 
@@ -90,6 +99,8 @@
 | 初始化数据库 | `python3.11 -m src.main init-db --config config/config.yaml` |
 | 跑一次完整流水线 | `python3.11 -m src.main run-once --config config/config.yaml` |
 | 循环运行 | `python3.11 -m src.main loop --config config/config.yaml` |
+| 启动 worker 脚本 | `./scripts/run_worker.sh` |
+| 查看健康状态 | `python3.11 scripts/health_check.py config/config.yaml` |
 | 打开仪表盘 | `streamlit run app/dashboard.py` |
 | 查看数据库概览 | `python3.11 scripts/db_summary.py` |
 

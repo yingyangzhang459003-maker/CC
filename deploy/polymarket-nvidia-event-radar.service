@@ -1,0 +1,18 @@
+[Unit]
+Description=Polymarket NVIDIA Event Radar Worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/polymarket-nvidia-event-radar
+Environment=PYTHONPATH=/opt/polymarket-nvidia-event-radar
+Environment=RADAR_CONFIG=/opt/polymarket-nvidia-event-radar/config/config.example.yaml
+ExecStart=/opt/polymarket-nvidia-event-radar/scripts/run_worker.sh
+Restart=always
+RestartSec=15
+User=ubuntu
+Group=ubuntu
+
+[Install]
+WantedBy=multi-user.target

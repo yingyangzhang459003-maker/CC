@@ -143,6 +143,19 @@ class SystemLog(Base):
     created_at: Mapped[str] = mapped_column(String(64), server_default=func.now())
 
 
+class RuntimeRun(Base):
+    __tablename__ = "runtime_runs"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    run_id: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    command: Mapped[str] = mapped_column(String(64), index=True)
+    status: Mapped[str] = mapped_column(String(32), index=True)
+    started_at: Mapped[str] = mapped_column(String(64), index=True)
+    finished_at: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    duration_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)
+    result_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
 def make_engine(database_url: str):
     if database_url.startswith("sqlite:///"):
         db_path = database_url.replace("sqlite:///", "", 1)

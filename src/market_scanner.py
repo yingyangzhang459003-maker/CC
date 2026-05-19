@@ -14,6 +14,8 @@ logger = logging.getLogger(__name__)
 
 
 class PolymarketMarketScanner:
+    """Discover, normalize, rank and persist NVIDIA/NVDA-related Polymarket markets."""
+
     def __init__(self, config):
         self.config = config
         self.api_base = config.get("polymarket.gamma_api_base", "https://gamma-api.polymarket.com").rstrip("/")
@@ -21,6 +23,9 @@ class PolymarketMarketScanner:
         self.keywords = config.get("nvidia_keywords", [])
         self.page_limit = int(config.get("polymarket.page_limit", 200))
         self.max_pages = int(config.get("polymarket.max_pages", 5))
+        self.min_volume = float(config.get("market_filters.min_volume", 0) or 0)
+        self.min_liquidity = float(config.get("market_filters.min_liquidity", 0) or 0)
+        self.max_spread = float(config.get("market_filters.max_spread", 1) or 1)
         self.ranker = MarketRanker()
 
     def fetch_active_markets(self) -> list[dict[str, Any]]:
@@ -62,8 +67,9 @@ class PolymarketMarketScanner:
         liquidity = safe_float(raw.get("liquidity") or raw.get("liquidityNum"))
         spread = abs(1.0 - (yes_price + no_price)) if yes_price and no_price else safe_float(raw.get("spread"))
         slug = raw.get("slug") or raw.get("marketSlug") or raw.get("id")
+        market_id = str(raw.get("id") or raw.get("conditionId") or raw.get("questionID") or slug)
         return {
-            "market_id": str(raw.get("id") or raw.get("conditionId") or raw.get("questionID") or slug),
+            "market_id": market_id,
             "event_id": str(raw.get("eventId") or raw.get("event_id") or ""),
             "title": raw.get("question") or raw.get("title") or "",
             "url": f"https://polymarket.com/market/{slug}" if slug else None,
@@ -84,6 +90,28 @@ class PolymarketMarketScanner:
             "created_at": raw.get("createdAt") or utc_now_iso(),
             "updated_at": utc_now_iso(),
         }
+
+    def passes_filters(self, data: dict[str, Any]) -> bool:
+        """Apply configurable liquidity, volume and spread filters after normalization."""
+        if data["volume"] < self.min_volume:
+            return False
+        if data["liquidity"] < self.min_liquidity:
+            return False
+        if data["spread"] and data["spread"] > self.max_spread:
+            return False
+        return True
+
+    def sort_candidates(self, candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Prefer liquid and recently active markets when multiple NVIDIA candidates exist."""
+        return sorted(
+            candidates,
+            key=lambda item: (
+                safe_float(item.get("volume24hr") or item.get("volume24h")),
+                safe_float(item.get("liquidity") or item.get("liquidityNum")),
+                safe_float(item.get("volume") or item.get("volumeNum")),
+            ),
+            reverse=True,
+        )
 
     def mock_markets(self) -> list[dict[str, Any]]:
         samples = [
@@ -118,20 +146,26 @@ class PolymarketMarketScanner:
         ]
         return samples
 
-    def scan_and_store(self, session) -> list[Market]:
+    def scan_candidates(self) -> list[dict[str, Any]]:
+        """Fetch, filter and sort raw market candidates, using mock fallback only when configured."""
         try:
             markets = self.fetch_active_markets()
             related_raw = self.find_related_markets(markets)
             if not related_raw and self.config.get("mock_sources.enabled", True):
-                logger.warning("No live NVIDIA markets found; using mock markets for MVP validation.")
+                logger.warning("No live NVIDIA markets found; using mock markets for validation.")
                 related_raw = self.mock_markets()
         except Exception as exc:
             logger.exception("Polymarket scan failed; falling back to mock data: %s", exc)
             related_raw = self.mock_markets() if self.config.get("mock_sources.enabled", True) else []
+        return self.sort_candidates(related_raw)
 
+    def scan_and_store(self, session) -> list[Market]:
         stored: list[Market] = []
-        for raw in related_raw:
+        for raw in self.scan_candidates():
             data = self.normalize_market(raw)
+            if not self.passes_filters(data):
+                logger.info("Skipping market by filters: %s", data["title"])
+                continue
             existing = session.execute(select(Market).where(Market.market_id == data["market_id"])).scalar_one_or_none()
             if existing:
                 for key, value in data.items():

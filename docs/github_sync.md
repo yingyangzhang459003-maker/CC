@@ -1,52 +1,69 @@
 # GitHub 同步说明
 
-本项目已经初始化为本地 Git 仓库，并已包含源码、配置模板、文档、测试、运行脚本和部署模板。远程同步到 GitHub 时，核心原则是 **只推送代码与非敏感配置模板，不推送真实密钥、钱包信息或本地数据库**。
+本项目已经完成本地 Git 初始化、远程仓库配置、推送前安全检查与 GitHub 同步。远程仓库为 [`yingyangzhang459003-maker/CC`](https://github.com/yingyangzhang459003-maker/CC)，当前 `main` 分支已包含 Polymarket NVIDIA Event Radar 的 MVP 与核心增强代码。
 
-## 需要你提供什么
+## 同步状态
 
-| 信息 | 是否必须 | 说明 |
+| 项目 | 状态 | 说明 |
 | --- | --- | --- |
-| GitHub 仓库 URL | 必须 | 例如 `https://github.com/yourname/polymarket-nvidia-event-radar.git` 或 SSH 格式 `git@github.com:yourname/polymarket-nvidia-event-radar.git`。 |
-| 仓库可见性 | 建议提供 | 确认是 private 还是 public。量化交易研究项目建议先用 private。 |
-| 授权方式 | 必须选择一种 | 可选浏览器登录、GitHub CLI 登录、或提供临时 fine-grained token。 |
-| 是否需要我直接推送 | 建议确认 | 如果你只需要命令，我可以给出本地操作步骤；如果要我代推，需要完成授权。 |
+| 目标仓库 | 已配置 | `https://github.com/yingyangzhang459003-maker/CC.git`。 |
+| 本地分支 | 已配置 | 本地 `main` 分支已经设置为跟踪远程 `origin/main`。 |
+| 推送结果 | 已完成 | 本地 `main` 已成功推送到 GitHub。 |
+| 本地 HEAD | 已验证 | `602cf10014a9d2532a196b8461224ca943c72fe2`。 |
+| 远程 HEAD | 已验证 | `602cf10014a9d2532a196b8461224ca943c72fe2`，与本地 HEAD 一致。 |
+| 关键目录 | 已验证 | 远程仓库包含 `src/`、`tests/`、`config/`、`scripts/`、`deploy/`、`docs/`、`app/` 等目录，以及 `README.md`、`requirements.txt`、`.env.example`、`.gitignore` 和 `LICENSE`。 |
 
-## 推荐授权方式
+## 当前提交历史
 
-| 方式 | 适用场景 | 操作说明 | 安全建议 |
-| --- | --- | --- | --- |
-| 浏览器登录 GitHub | 你希望我在当前环境直接推送 | 我打开 GitHub 页面后，你接管浏览器完成登录与授权。 | 不要在聊天中发送密码或 2FA 验证码。 |
-| GitHub CLI 登录 | 你接受设备码授权 | 执行 `gh auth login`，你在浏览器完成设备码确认。 | 授权完成后可随时在 GitHub settings 撤销。 |
-| Fine-grained token | 你已有目标仓库且希望快速推送 | 提供只对该仓库有 `Contents: Read and write` 权限的临时 token。 | 设置短有效期；推送后立即撤销。 |
+| 提交 | 说明 |
+| --- | --- |
+| `0de2d6c` | Initial Polymarket NVIDIA Event Radar MVP。 |
+| `2401d6d` | Enhance core trading loop and runtime monitoring。 |
+| `602cf10` | Merge GitHub initial repository metadata，合并远程初始仓库元数据并保留远程 `LICENSE`。 |
 
-## 手动同步命令
+## 安全边界
 
-如果你自己在本地同步，可以进入项目目录后执行以下命令。首次推送前请确认 `.gitignore` 已生效，且 `.env`、数据库、私钥、助记词和任何 API Key 没有被加入 Git。
+本次同步遵循 **只推送代码、文档、配置模板和部署模板，不推送真实密钥、钱包信息或生产数据库** 的原则。项目中的 `.env.example` 和 `config/config.example.yaml` 仅作为配置模板使用；真实 API Key、钱包私钥、助记词、GitHub token、交易账户凭据和本地运行数据库不应提交到 Git。
+
+| 风险项 | 当前处理 | 后续建议 |
+| --- | --- | --- |
+| 环境变量与 API Key | 仅保留模板文件。 | 在部署主机上通过 `.env` 或系统服务环境变量注入真实值。 |
+| Polymarket 钱包或资金凭据 | 未纳入项目代码。 | 第一阶段为纸面交易，不应配置真实资金权限。 |
+| SQLite 本地数据库 | 通过 `.gitignore` 排除实际数据库文件。 | 如需备份数据，使用单独的私有存储或加密归档。 |
+| GitHub 认证凭据 | 使用授权集成完成推送。 | 推送完成后，如不再需要，可在 GitHub 设置中撤销临时授权。 |
+
+## 手动克隆与运行
+
+如果需要在本地或服务器上重新部署项目，可以执行以下命令。首次运行前请根据 `README.md` 配置 Python 虚拟环境、依赖和配置文件。
 
 ```bash
-cd polymarket-nvidia-event-radar
+git clone https://github.com/yingyangzhang459003-maker/CC.git
+cd CC
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp config/config.example.yaml config/config.yaml
+python -m src.main status
+```
+
+如需启动后台监控循环，可以使用项目内的脚本或 systemd 模板。对于需要长期稳定运行、分钟级或小时级监控的场景，建议部署到一台持续在线的 Linux 主机，并使用 `scripts/run_worker.sh`、`scripts/health_check.py` 和 `deploy/polymarket-nvidia-event-radar.service` 管理运行状态。
+
+## 后续同步命令
+
+后续如果继续修改代码，可以在项目目录中执行以下命令提交并同步。
+
+```bash
 git status
-git remote add origin YOUR_GITHUB_REPO_URL
-git branch -M main
-git push -u origin main
+git add .
+git commit -m "Describe changes"
+git push
 ```
 
-如果远程仓库已经存在 `origin`，应改用：
+在每次提交前，建议执行以下安全检查，确认没有误提交敏感数据。
 
 ```bash
-git remote set-url origin YOUR_GITHUB_REPO_URL
-git push -u origin main
+git status --short
+git ls-files | grep -E '(^\.env$|data/.*\.db|secrets|private|mnemonic|wallet|token)'
 ```
 
-## 推送前安全检查
-
-| 检查项 | 命令 | 预期结果 |
-| --- | --- | --- |
-| 查看未提交文件 | `git status --short` | 只看到预期源码、文档和配置模板。 |
-| 检查敏感文件 | `git ls-files | grep -E '(^\.env$|data/.*\.db|secrets|key|private|mnemonic)'` | 不应输出真实敏感文件。 |
-| 查看提交历史 | `git log --oneline --decorate -5` | 最近提交应描述核心增强或 MVP。 |
-| 查看远程地址 | `git remote -v` | 指向你的 GitHub 仓库。 |
-
-## 我可以直接帮你推送时的流程
-
-你回复 GitHub 仓库 URL，并说明采用哪种授权方式。如果需要我通过浏览器或 GitHub CLI 登录，我会先打开对应页面或启动授权流程，然后请你接管完成登录。完成后，我会执行安全检查、添加远程仓库、推送 `main` 分支，并把最终仓库链接与提交哈希反馈给你。
+如果第二条命令输出真实敏感文件，应立即从 Git 暂存区或历史中移除后再推送。

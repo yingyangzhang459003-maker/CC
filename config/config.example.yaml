@@ -1,0 +1,93 @@
+scan_interval_seconds: 300
+
+market_filters:
+  min_volume: 0
+  min_liquidity: 0
+  max_spread: 0.40
+
+target_platform:
+  - polymarket
+
+target_company:
+  name: NVIDIA
+  ticker: NVDA
+  sec_cik: "0001045810"
+
+nvidia_keywords:
+  - NVIDIA
+  - NVDA
+  - Nvidia
+  - 英伟达
+  - Jensen Huang
+  - Jensen
+  - Huang
+  - GPU
+  - AI chip
+  - Blackwell
+  - GB200
+  - H100
+  - H200
+  - B100
+  - B200
+  - CUDA
+  - data center
+  - AI accelerator
+  - Nvidia earnings
+  - Nvidia stock
+  - Nvidia market cap
+  - Nvidia revenue
+  - Nvidia guidance
+  - Nvidia China
+  - export control
+  - semiconductor
+  - TSMC
+  - AI semiconductor
+
+paper_trading:
+  initial_balance: 1000
+  position_size_percent: 2
+  stop_loss_percent: 20
+  take_profit_percent: 30
+  estimated_fee_percent: 1
+  estimated_slippage_percent: 1
+  max_open_trades_per_market: 3
+
+ai:
+  provider: openai
+  model: gpt-4.1-mini
+  min_confidence: 0.65
+  min_impact_score: 6
+  use_llm: false
+
+polymarket:
+  gamma_api_base: https://gamma-api.polymarket.com
+  clob_api_base: https://clob.polymarket.com
+  request_timeout_seconds: 20
+  page_limit: 200
+  max_pages: 5
+
+rss_sources:
+  - name: nvidia_newsroom
+    account: NVIDIA Newsroom
+    url: https://nvidianews.nvidia.com/news?output=rss
+    source_quality: official
+  - name: nvidia_developer_blog
+    account: NVIDIA Developer Blog
+    url: https://developer.nvidia.com/blog/feed/
+    source_quality: official
+  - name: sec_company_filings
+    account: SEC EDGAR NVIDIA
+    url: https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=NVDA&type=&dateb=&owner=include&count=40&output=atom
+    source_quality: official
+
+sec:
+  cik: "0001045810"
+  watched_forms:
+    - 10-K
+    - 10-Q
+    - 8-K
+    - 4
+    - DEF 14A
+
+mock_sources:
+  enabled: true
